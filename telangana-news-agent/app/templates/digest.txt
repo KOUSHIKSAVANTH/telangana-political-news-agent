@@ -1,0 +1,36 @@
+TELANGANA NEWS BRIEF | {{ date_label }}
+Covering {{ window_start|ist }} - {{ window_end|ist }}
+{{ total }} development(s) from {{ sources_count }} source(s).
+{% if light_news %}
+Light news day: few credible Telangana developments were found. Nothing has been added to fill space.
+{% endif %}
+{% macro item_txt(item) %}
+- {% if item.story.priority in ('critical', 'high') %}[{{ item.story.priority|upper }}] {% endif %}{{ item.story.title }}
+  {{ item.story.summary }}
+{% if item.story.why_it_matters %}
+  Comms: {{ item.story.why_it_matters }}
+{% endif %}
+  Status: {{ item.story.verification_status }}{% if item.story.districts %} | {{ item.story.districts|join(', ') }}{% endif %}
+
+{% for a in item.sources %}
+  * {{ a.publisher }} ({{ a.published_at|ist }}): {{ a|link }}
+{% endfor %}
+{% endmacro %}
+{% if follow_ups %}
+
+== FOLLOW-UPS TO EARLIER ALERTS ==
+{% for item in follow_ups %}{{ item_txt(item) }}{% endfor %}
+{% endif %}
+{% for section in sections %}
+
+== {{ section.title|upper }} ==
+{% for item in section['items'] %}{{ item_txt(item) }}{% endfor %}
+{% endfor %}
+{% if not sections and not follow_ups %}
+
+No credible Telangana developments were collected in this window.
+{% endif %}
+
+{% if source_issues %}Collection issues: {{ source_issues|join('; ') }}.
+{% endif %}
+Brief ID {{ brief_id }}. Automated internal monitoring; verify before any public statement.

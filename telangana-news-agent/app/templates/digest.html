@@ -1,0 +1,40 @@
+<!doctype html>
+<html><body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;color:#18181b;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:16px 0;">
+<tr><td align="center">
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#ffffff;border-radius:6px;">
+  <tr><td style="background:#1e3a8a;color:#fff;padding:16px 20px;">
+    <div style="font-size:20px;font-weight:bold;">Telangana News Brief</div>
+    <div style="font-size:13px;margin-top:4px;">{{ date_label }} &middot; covering {{ window_start|ist }} &ndash; {{ window_end|ist }}</div>
+  </td></tr>
+  <tr><td style="padding:12px 20px 0;font-size:13px;color:#3f3f46;">
+    {{ total }} development(s) from {{ sources_count }} source(s).
+    {% if light_news %}<br><strong>Light news day:</strong> few credible Telangana developments were found in this window. Nothing has been added to fill space.{% endif %}
+    {% if not ai_used %}<br><em>AI summaries were unavailable for some items; publisher excerpts are shown instead.</em>{% endif %}
+  </td></tr>
+
+  {% if follow_ups %}
+  <tr><td style="padding:16px 20px 0;">
+    <div style="font-size:16px;font-weight:bold;border-bottom:2px solid #1e3a8a;padding-bottom:4px;">Follow-ups to earlier alerts</div>
+    {% for item in follow_ups %}{% include "_digest_item.html" %}{% endfor %}
+  </td></tr>
+  {% endif %}
+
+  {% for section in sections %}
+  <tr><td style="padding:16px 20px 0;">
+    <div style="font-size:16px;font-weight:bold;border-bottom:2px solid #1e3a8a;padding-bottom:4px;">{{ section.title }}</div>
+    {% for item in section['items'] %}{% include "_digest_item.html" %}{% endfor %}
+  </td></tr>
+  {% endfor %}
+
+  {% if not sections and not follow_ups %}
+  <tr><td style="padding:16px 20px;font-size:14px;">No credible Telangana developments were collected in this window.</td></tr>
+  {% endif %}
+
+  <tr><td style="padding:16px 20px;font-size:11px;color:#71717a;border-top:1px solid #e4e4e7;">
+    {% if source_issues %}Collection issues: {{ source_issues|join('; ') }}.<br>{% endif %}
+    Brief ID {{ brief_id }}. Automated internal monitoring. Every item links to its original source; verify before any public statement.
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>

@@ -1,0 +1,10 @@
+.env
+*.db
+out/
+tests/
+__pycache__/
+.pytest_cache/
+.venv/
+.git/
+client_secret*.json
+token*.json

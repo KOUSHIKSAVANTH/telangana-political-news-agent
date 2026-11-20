@@ -1,0 +1,11 @@
+.env
+*.db
+out/
+__pycache__/
+.pytest_cache/
+.venv/
+*.egg-info/
+build/
+dist/
+client_secret*.json
+token*.json

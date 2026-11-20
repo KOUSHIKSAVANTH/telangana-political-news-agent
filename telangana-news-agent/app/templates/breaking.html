@@ -1,0 +1,41 @@
+<!doctype html>
+<html><body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;color:#18181b;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:16px 0;">
+<tr><td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:6px;">
+  {% if review %}
+  <tr><td style="background:#a16207;color:#fff;padding:10px 20px;font-size:13px;">
+    <strong>REVIEW REQUIRED &mdash; not sent to the team.</strong> {{ decision_reason }}. Verify before forwarding.
+  </td></tr>
+  {% endif %}
+  <tr><td style="background:{{ '#b91c1c' if story.priority == 'critical' else '#c2410c' }};color:#fff;padding:14px 20px;">
+    <div style="font-size:12px;letter-spacing:1px;">TELANGANA ALERT &middot; {{ story.priority|upper }} &middot; {{ story.verification_status|upper }}</div>
+    <div style="font-size:20px;font-weight:bold;margin-top:4px;">{{ story.title }}</div>
+  </td></tr>
+  <tr><td style="padding:16px 20px;font-size:15px;line-height:1.5;">
+    <p style="margin:0 0 12px;"><strong>What happened.</strong> {{ story.summary }}</p>
+    {% if story.why_it_matters %}<p style="margin:0 0 12px;"><strong>Why it matters.</strong> {{ story.why_it_matters }}</p>{% endif %}
+    <p style="margin:0 0 12px;"><strong>Suggested next step (internal).</strong> {{ next_step }}</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="font-size:13px;color:#3f3f46;margin:0 0 12px;">
+      <tr><td style="padding:2px 12px 2px 0;">Place</td><td>{{ story.districts|join(', ') if story.districts else 'Not stated' }}</td></tr>
+      <tr><td style="padding:2px 12px 2px 0;">Published</td><td>{{ published|ist }}</td></tr>
+      <tr><td style="padding:2px 12px 2px 0;">Detected</td><td>{{ detected|ist }}</td></tr>
+      <tr><td style="padding:2px 12px 2px 0;">Last checked</td><td>{{ checked|ist }}</td></tr>
+      <tr><td style="padding:2px 12px 2px 0;">Status</td><td>{{ story.verification_status }} &mdash; {{ evidence.independent_sources }} independent source(s){% if evidence.has_official %}, incl. official source{% endif %}{% if evidence.copies_collapsed %}; {{ evidence.copies_collapsed }} copy/copies not counted{% endif %}</td></tr>
+      {% if story.reason %}<tr><td style="padding:2px 12px 2px 0;vertical-align:top;">Assessment</td><td>{{ story.reason }}</td></tr>{% endif %}
+    </table>
+    <p style="margin:0 0 6px;"><strong>Sources</strong></p>
+    <ol style="margin:0 0 12px;padding-left:20px;">
+      {% for a in sources %}
+      <li style="margin-bottom:4px;"><a href="{{ a|link }}" style="color:#1d4ed8;">{{ a.title }}</a><br>
+        <span style="font-size:12px;color:#71717a;">{{ a.publisher }} &middot; published {{ a.published_at|ist }}{% if a.language == 'te' and a.title_en %} &middot; EN: {{ a.title_en }}{% endif %}</span></li>
+      {% endfor %}
+    </ol>
+  </td></tr>
+  <tr><td style="padding:10px 20px 16px;font-size:11px;color:#71717a;border-top:1px solid #e4e4e7;">
+    Alert ID {{ alert_id }} &middot; Story #{{ story.id }} &middot; Summary {{ 'AI-generated from the cited sources' if story.analysis_source not in (None, 'heuristic') else 'taken from publisher excerpts (AI unavailable)' }}.
+    Automated internal monitoring &mdash; verify before any public statement.
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>

@@ -1,0 +1,122 @@
+# Relevance, geography and topic keywords. Editable without code changes.
+# Matching rules:
+#   - English keywords: case-insensitive, whole-word.
+#   - Telugu keywords: substring match (Telugu attaches suffixes, e.g. తెలంగాణలో),
+#     after removing zero-width joiners (U+200C / U+200D).
+
+relevance_keywords:
+  en: [telangana, hyderabad, secunderabad, cyberabad, ghmc, hmda, hmwssb, tgsrtc, tsrtc,
+       revanth reddy, ktr, kcr, harish rao, brs, trs, bhatti vikramarka, kavitha,
+       musi, osmania university, kaleshwaram]
+  te: [తెలంగాణ, హైదరాబాద్, సికింద్రాబాద్, రేవంత్, కేటీఆర్, కేసీఆర్, హరీశ్, బీఆర్ఎస్, జీహెచ్ఎంసీ,
+       భట్టి, కవిత, మూసీ, కాళేశ్వరం]
+
+# Scope: POLITICAL content only (politics, government, policy, elections, governance).
+# An item is dropped at collection time when it is marked out of scope (by the publisher's
+# section/tag or a keyword below) AND its title/excerpt contains none of political_keywords.
+# So "Actor joins BJP" or "GO on cinema ticket prices" stay in; a match report does not.
+# Items that pass this cheap filter are judged again by the AI (political_relevant).
+scope:
+  # Publisher feed tags or URL path sections (case-insensitive, whole tag / whole path segment).
+  exclude_sections: [entertainment, sport, sports, cricket, football, tennis, badminton, kabaddi,
+                     cinema, movies, movie, movie reviews, movie-reviews, tollywood, bollywood,
+                     kollywood, television, tv, ott, web series, music, lifestyle, fashion, food,
+                     travel, astrology, horoscope, spirituality, devotional, health and fitness,
+                     gadgets, technology, auto, automobile, science, gallery, photos, viral, trending-viral]
+  exclude_keywords:
+    en: [cricket, ipl, t20, odi, wicket, test match, world cup, football, isl, badminton, tennis,
+         kabaddi, olympics, olympian, box office, movie, film review, trailer, teaser, first look,
+         tollywood, bollywood, ott, web series, actor, actress, heroine, celebrity, bigg boss,
+         music director, audio launch, pre-release, horoscope, recipe, fashion, smartphone, gadget]
+    te: [సినిమా, మూవీ, ట్రైలర్, టీజర్, హీరోయిన్, బాక్సాఫీస్, టాలీవుడ్, బాలీవుడ్, ఓటీటీ, క్రికెట్,
+         ఐపీఎల్, బిగ్ బాస్, రాశి ఫలాలు, రాశిఫలాలు, దినఫలాలు, వంటకం]
+  # Any of these keeps an item in scope even if it matched an exclusion above. Also used by the
+  # no-AI fallback: a story with none of these is treated as non-political.
+  political_keywords:
+  # Avoid words with common non-political senses ("party", "budget", "strike", "campaign", "go").
+    en: [government, govt, minister, ministry, cabinet, chief minister, deputy cm, assembly,
+         legislature, legislative council, mla, mlas, mlc, mp, mps, lok sabha, rajya sabha, governor,
+         congress, bjp, brs, trs, aimim, tdp, ysrcp, cpi, cpi(m), bsp, jana sena, opposition,
+         election, elections, bypoll, voter, voters, election campaign, manifesto,
+         policy, policies, scheme, schemes, welfare, six guarantees, government order, ordinance,
+         high court, hc, supreme court, election commission, electoral roll, electoral rolls,
+         special intensive revision, acb, ngt, hydraa, department, officials, ias, ips, legislator,
+         collector, municipal, corporator,
+         ghmc, panchayat, sarpanch, zptc, mptc, mayor, protest, dharna, agitation, bandh,
+         revanth reddy, ktr, kcr, harish rao, bhatti vikramarka, kishan reddy, bandi sanjay,
+         owaisi, rahul gandhi, modi, union government, central government, ticket prices, ticket rates]
+    te: [ప్రభుత్వ, మంత్రి, సీఎం, ముఖ్యమంత్రి, అసెంబ్లీ, శాసన, ఎమ్మెల్యే, ఎమ్మెల్సీ, ఎంపీ, గవర్నర్,
+         కాంగ్రెస్, బీజేపీ, బీఆర్ఎస్, ఎంఐఎం, ప్రతిపక్ష, ఎన్నిక, ఓటర్, మేనిఫెస్టో,
+         పథకం, సంక్షేమ, గ్యారంటీ, జీవో, హైకోర్టు, సుప్రీంకోర్టు, కలెక్టర్, మున్సిపల్,
+         కార్పొరేట, పంచాయతీ, సర్పంచ్, మేయర్, ధర్నా, నిరసన, బంద్,
+         రేవంత్, కేటీఆర్, కేసీఆర్, హరీశ్, భట్టి, కిషన్ రెడ్డి, బండి సంజయ్, ఒవైసీ, రాహుల్ గాంధీ, మోదీ]
+
+# Telangana's 33 districts. key = canonical English name used in emails.
+districts:
+  Adilabad: [adilabad, ఆదిలాబాద్]
+  Bhadradri Kothagudem: [bhadradri, kothagudem, భద్రాద్రి, కొత్తగూడెం]
+  Hanumakonda: [hanumakonda, hanamkonda, హనుమకొండ]
+  Hyderabad: [hyderabad, secunderabad, హైదరాబాద్, సికింద్రాబాద్]
+  Jagtial: [jagtial, jagitial, జగిత్యాల]
+  Jangaon: [jangaon, janagama, జనగామ]
+  Jayashankar Bhupalpally: [bhupalpally, bhupalapally, భూపాలపల్లి]
+  Jogulamba Gadwal: [gadwal, గద్వాల]
+  Kamareddy: [kamareddy, కామారెడ్డి]
+  Karimnagar: [karimnagar, కరీంనగర్]
+  Khammam: [khammam, ఖమ్మం]
+  Kumuram Bheem Asifabad: [asifabad, ఆసిఫాబాద్]
+  Mahabubabad: [mahabubabad, మహబూబాబాద్]
+  Mahabubnagar: [mahabubnagar, mahbubnagar, మహబూబ్నగర్]
+  Mancherial: [mancherial, మంచిర్యాల]
+  Medak: [medak, మెదక్]
+  Medchal-Malkajgiri: [medchal, malkajgiri, మేడ్చల్, మల్కాజిగిరి]
+  Mulugu: [mulugu, ములుగు]
+  Nagarkurnool: [nagarkurnool, నాగర్కర్నూల్]
+  Nalgonda: [nalgonda, నల్గొండ, నల్లగొండ]
+  Narayanpet: [narayanpet, నారాయణపేట]
+  Nirmal: [nirmal, నిర్మల్]
+  Nizamabad: [nizamabad, నిజామాబాద్]
+  Peddapalli: [peddapalli, పెద్దపల్లి]
+  Rajanna Sircilla: [sircilla, సిరిసిల్ల]
+  Rangareddy: [rangareddy, ranga reddy, రంగారెడ్డి]
+  Sangareddy: [sangareddy, సంగారెడ్డి]
+  Siddipet: [siddipet, సిద్దిపేట]
+  Suryapet: [suryapet, సూర్యాపేట]
+  Vikarabad: [vikarabad, వికారాబాద్]
+  Wanaparthy: [wanaparthy, వనపర్తి]
+  Warangal: [warangal, వరంగల్]
+  Yadadri Bhuvanagiri: [yadadri, bhongir, bhuvanagiri, యాదాద్రి, భువనగిరి]
+
+# Category keywords: used only by the no-Gemini fallback classifier and as hints.
+# Category values map to digest sections in pipeline.yaml.
+categories:
+  government_politics:
+    en: [government, minister, cabinet, assembly, legislature, chief minister, cm, congress, bjp, brs,
+         aimim, election, mla, mp, policy, scheme, department, governor, high court, cabinet meeting, party]
+    te: [ప్రభుత్వం, మంత్రి, సీఎం, ముఖ్యమంత్రి, అసెంబ్లీ, ఎన్నిక, ఎమ్మెల్యే, కాంగ్రెస్, బీజేపీ, పథకం, హైకోర్టు]
+  public_issues:
+    en: [water, power, electricity, traffic, metro, road, flood, rain, weather, police, accident, fire,
+         hospital, health, school, education, university, students, farmers, civic, drainage, safety,
+         crime, temperature, cyclone, outage]
+    te: [నీరు, విద్యుత్, ట్రాఫిక్, మెట్రో, రోడ్డు, వరద, వర్షం, పోలీసు, ప్రమాదం, ఆసుపత్రి, విద్యార్థు, రైతు]
+  business_economy:
+    en: [investment, industry, jobs, employment, company, startup, it sector, economy, budget, revenue,
+         mou, factory, real estate, gdp, exports]
+    te: [పెట్టుబడి, పరిశ్రమ, ఉద్యోగ, కంపెనీ, బడ్జెట్, రియల్]
+
+# Used by the no-Gemini fallback to guess priority. Gemini decides when available.
+priority_keywords:
+  critical:
+    en: [stampede, explosion, blast, building collapse, dam breach, cyclone warning, red alert,
+         curfew, riot, terror, death toll, killed, evacuat]
+    te: [తొక్కిసలాట, పేలుడు, కూలి, రెడ్ అలర్ట్, కర్ఫ్యూ, మృతి]
+  high:
+    en: [orange alert, flood, heavy rain, cabinet decision, resign, arrested, suspended, ordinance,
+         strike, bandh, protest, high court orders, outage]
+    te: [ఆరెంజ్ అలర్ట్, వరద, భారీ వర్షం, రాజీనామా, అరెస్టు, బంద్, ధర్నా, సమ్మె]
+
+# Stories matching these never auto-send an alert (they go to the review path).
+politically_sensitive_keywords:
+  en: [communal, caste, religion, allegation, alleged, accused, scam, corruption, defamation,
+       election commission, vote, defection, rumour, viral video, fake news]
+  te: [ఆరోపణ, కుంభకోణం, అవినీతి, కులం, మతం, ఫిరాయింపు]

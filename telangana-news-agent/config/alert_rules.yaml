@@ -1,0 +1,38 @@
+# Breaking-alert policy (spec section 7). Editable without code changes.
+
+# review: every qualifying alert goes ONLY to the reviewer address, prefixed [REVIEW].
+#         A human decides whether to forward it to the team.
+# auto:   alerts that pass every check below go straight to the team list;
+#         anything politically sensitive / unverified still goes to the reviewer.
+# Start in "review" until the team signs off (open decision #3).
+mode: review
+
+# Only these priorities can produce a breaking alert. Everything else -> digest.
+alert_priorities: [critical, high]
+
+# Evidence thresholds (deterministic, applied AFTER Gemini).
+evidence:
+  # Independent outlets = distinct `independence_group`s whose excerpts are not near-identical
+  # copies of each other (copied wire reports count once).
+  min_independent_sources:
+    critical: 2
+    high: 2
+  # An official source (type: official) counts as primary evidence for what that authority
+  # announced. With this on, official + 0 other outlets can satisfy the threshold.
+  official_source_satisfies: true
+  # Excerpts with similarity >= this are treated as copies of the same report.
+  copy_similarity_threshold: 0.85
+
+# A story is "breaking" only if its earliest article was published within this window.
+max_story_age_hours: 6
+
+# No second alert for the same story within the cooldown, unless Gemini (or a new
+# official source) marks a material factual update.
+cooldown_hours: 5
+
+# Hard caps to bound email frequency.
+max_alerts_per_run: 3
+max_alerts_per_day: 12
+
+# true -> politically sensitive stories are never auto-sent, even in auto mode.
+block_sensitive_auto_send: true

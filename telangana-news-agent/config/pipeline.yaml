@@ -1,0 +1,85 @@
+# Collection, AI, budget, digest and retention settings. Non-secret; edit freely.
+
+collection:
+  request_timeout_seconds: 20
+  user_agent: "TelanganaNewsAgent/0.1 (+internal comms monitoring)"
+  # Ignore feed items older than this on first sight (avoids importing whole archives).
+  max_item_age_hours: 72
+  excerpt_max_chars: 400
+
+clustering:
+  # Articles whose (English) titles have similarity >= threshold, published within
+  # window_hours of each other, are grouped into one story.
+  similarity_threshold: 0.42
+  window_hours: 36
+
+# AI provider: env LLM_PROVIDER=gemini|groq|none (default: whichever API key is set).
+# Budgets below are per provider and enforced in code.
+
+groq:
+  # Override with env GROQ_MODEL. Run: python -m app.groq_processor  (lists models for your key)
+  # Free-tier limits are per model (requests/min, tokens/min, tokens/day): console.groq.com/settings/limits
+  model: openai/gpt-oss-120b
+  max_calls_per_run: 15
+  max_calls_per_day: 400
+  temperature: 0.1
+
+gemini:
+  # Override with env GEMINI_MODEL. Pick based on current pricing/quotas (open decision #5).
+  model: gemini-2.5-flash
+  # Upper bound on Gemini requests per monitor run (cost/quota guard).
+  max_calls_per_run: 20
+  # Upper bound on Gemini requests per day across runs.
+  max_calls_per_day: 1200
+  temperature: 0.1
+
+tavily:
+  # Optional. Also requires env TAVILY_API_KEY.
+  enabled: false
+  search_depth: basic          # basic = 1 credit/search at time of writing; verify live pricing
+  max_results: 5
+  daily_credit_cap: 20
+  monthly_credit_cap: 600      # keep under the free allowance you actually have
+  # Scheduled focused searches run only during monitor runs in these IST hours.
+  scheduled_hours_ist: [8, 15]
+  scheduled_queries:
+    - Telangana government announcement today
+    - Hyderabad civic issue news today
+    - తెలంగాణ ప్రభుత్వం తాజా వార్తలు
+  # Corroboration searches for high/critical stories that lack enough sources.
+  corroborate_priorities: [critical, high]
+  max_corroborations_per_run: 2
+  # Only results from these domains are stored (keeps quality predictable).
+  allowed_domains:
+    - thehindu.com
+    - telanganatoday.com
+    - thehansindia.com
+    - siasat.com
+    - timesofindia.indiatimes.com
+    - indianexpress.com
+    - deccanchronicle.com
+    - newindianexpress.com
+    - eenadu.net
+    - andhrajyothy.com
+    - sakshi.com
+    - ntnews.com
+    - v6velugu.com
+    - telangana.gov.in
+    - pib.gov.in
+
+digest:
+  window_hours: 24
+  max_items: 10
+  # Below this many credible stories, the email states explicitly that coverage was light.
+  light_news_threshold: 3
+  sections:
+    # Political scope only: non-political stories never reach the digest (see topics.yaml `scope`).
+    - {key: government_politics, title: "Politics & Government"}
+    - {key: public_issues, title: "Public Issues & Governance"}
+    - {key: business_economy, title: "Economy & Policy"}
+    - {key: district_updates, title: "District Politics & Governance"}
+    - {key: emerging, title: "Emerging Stories"}
+
+retention:
+  articles_days: 45
+  runs_days: 90

@@ -1,0 +1,33 @@
+{% if review %}
+*** REVIEW REQUIRED - not sent to the team. {{ decision_reason }}. Verify before forwarding. ***
+
+{% endif %}
+TELANGANA ALERT | {{ story.priority|upper }} | {{ story.verification_status|upper }}
+{{ story.title }}
+
+WHAT HAPPENED
+{{ story.summary }}
+{% if story.why_it_matters %}
+
+WHY IT MATTERS
+{{ story.why_it_matters }}
+{% endif %}
+
+SUGGESTED NEXT STEP (internal)
+{{ next_step }}
+
+Place:        {{ story.districts|join(', ') if story.districts else 'Not stated' }}
+Published:    {{ published|ist }}
+Detected:     {{ detected|ist }}
+Last checked: {{ checked|ist }}
+Status:       {{ story.verification_status }} - {{ evidence.independent_sources }} independent source(s){% if evidence.has_official %}, incl. official source{% endif %}
+
+SOURCES
+{% for a in sources %}
+{{ loop.index }}. {{ a.title }}
+   {{ a.publisher }} - published {{ a.published_at|ist }}
+   {{ a|link }}
+{% endfor %}
+
+Alert ID {{ alert_id }} | Story #{{ story.id }}
+Automated internal monitoring - verify before any public statement.

@@ -1,0 +1,188 @@
+# Curated feed list. Every enabled feed below was fetched and parsed on 2026-11-19
+# (HTTP 200, entries present, publish timestamps present, robots.txt allows the feed URL).
+# Re-verify before production and confirm each publisher's reuse terms (open decision #4).
+#
+# Fields:
+#   type: publisher | official | aggregator
+#   telangana_specific: true  -> every item is presumed Telangana-relevant
+#                       false -> items must match topics.yaml relevance keywords
+#   independence_group: outlets in the same group are NOT counted as independent
+#                       corroboration (e.g. two feeds from the same publisher).
+
+sources:
+  # ---------- English ----------
+  - id: thehindu-telangana
+    name: The Hindu (Telangana)
+    language: en
+    type: publisher
+    feed_url: https://www.thehindu.com/news/national/telangana/feeder/default.rss
+    website: https://www.thehindu.com
+    independence_group: thehindu
+    telangana_specific: true
+    enabled: true
+
+  - id: thehindu-hyderabad
+    name: The Hindu (Hyderabad)
+    language: en
+    type: publisher
+    feed_url: https://www.thehindu.com/news/cities/Hyderabad/feeder/default.rss
+    website: https://www.thehindu.com
+    independence_group: thehindu
+    telangana_specific: true
+    enabled: true
+
+  - id: telanganatoday-telangana
+    name: Telangana Today
+    language: en
+    type: publisher
+    feed_url: https://telanganatoday.com/telangana/feed
+    website: https://telanganatoday.com
+    independence_group: telanganatoday
+    telangana_specific: true
+    enabled: true
+
+  - id: telanganatoday-hyderabad
+    name: Telangana Today (Hyderabad)
+    language: en
+    type: publisher
+    feed_url: https://telanganatoday.com/hyderabad/feed
+    website: https://telanganatoday.com
+    independence_group: telanganatoday
+    telangana_specific: true
+    enabled: true
+
+  - id: hansindia-telangana
+    name: The Hans India (Telangana)
+    language: en
+    type: publisher
+    feed_url: https://www.thehansindia.com/telangana/feed
+    website: https://www.thehansindia.com
+    independence_group: hansindia
+    telangana_specific: true
+    enabled: true
+
+  - id: siasat-telangana
+    name: Siasat (Telangana)
+    language: en
+    type: publisher
+    feed_url: https://www.siasat.com/news/telangana/feed/
+    website: https://www.siasat.com
+    independence_group: siasat
+    telangana_specific: true
+    enabled: true
+
+  - id: toi-hyderabad
+    name: Times of India (Hyderabad)
+    language: en
+    type: publisher
+    feed_url: https://timesofindia.indiatimes.com/rssfeeds/-2128816011.cms
+    website: https://timesofindia.indiatimes.com
+    independence_group: toi
+    telangana_specific: true
+    enabled: true
+
+  - id: indianexpress-hyderabad
+    name: Indian Express (Hyderabad)
+    language: en
+    type: publisher
+    feed_url: https://indianexpress.com/section/cities/hyderabad/feed/
+    website: https://indianexpress.com
+    independence_group: indianexpress
+    telangana_specific: true
+    enabled: false   # 2026-11-19: feed reachable but stale (newest item 7 Nov). Re-check later.
+
+  - id: deccanchronicle
+    name: Deccan Chronicle
+    language: en
+    type: publisher
+    # National feed; Telangana items are selected via topics.yaml keywords.
+    feed_url: https://www.deccanchronicle.com/google_feeds.xml
+    website: https://www.deccanchronicle.com
+    independence_group: deccanchronicle
+    telangana_specific: false
+    enabled: true
+
+  # ---------- Telugu ----------
+  - id: ntnews-telangana
+    name: Namasthe Telangana
+    language: te
+    type: publisher
+    feed_url: https://www.ntnews.com/telangana/feed
+    website: https://www.ntnews.com
+    independence_group: ntnews
+    telangana_specific: true
+    enabled: true
+
+  - id: v6velugu
+    name: V6 Velugu
+    language: te
+    type: publisher
+    feed_url: https://www.v6velugu.com/feed
+    website: https://www.v6velugu.com
+    independence_group: v6velugu
+    telangana_specific: false
+    enabled: true
+
+  - id: sakshi
+    name: Sakshi
+    language: te
+    type: publisher
+    feed_url: https://www.sakshi.com/rss.xml
+    website: https://www.sakshi.com
+    independence_group: sakshi
+    telangana_specific: false
+    enabled: true
+
+  - id: oneindia-telugu
+    name: Oneindia Telugu
+    language: te
+    type: publisher
+    feed_url: https://telugu.oneindia.com/rss/feeds/telugu-news-fb.xml
+    website: https://telugu.oneindia.com
+    independence_group: oneindia
+    telangana_specific: false
+    enabled: true
+
+  # ---------- Official ----------
+  - id: telangana-gov
+    name: Government of Telangana (telangana.gov.in)
+    language: en
+    type: official
+    feed_url: https://www.telangana.gov.in/feed/
+    website: https://www.telangana.gov.in
+    independence_group: govt-telangana
+    telangana_specific: true
+    # 2026-11-19: TLS failed from the dev network (expired self-signed cert presented).
+    # TLS verification is never disabled; check again from Cloud Run, disable if it still fails.
+    enabled: true
+
+  # ---------- Investigated, no working public feed found (2026-11-19) ----------
+  - id: eenadu
+    name: Eenadu
+    language: te
+    type: publisher
+    feed_url: null   # /rss/telangana-news.xml returned HTML, not a feed
+    website: https://www.eenadu.net
+    independence_group: eenadu
+    telangana_specific: true
+    enabled: false
+
+  - id: andhrajyothy
+    name: Andhra Jyothy
+    language: te
+    type: publisher
+    feed_url: null   # /rss returned 404
+    website: https://www.andhrajyothy.com
+    independence_group: andhrajyothy
+    telangana_specific: true
+    enabled: false
+
+  - id: newindianexpress-telangana
+    name: The New Indian Express (Telangana)
+    language: en
+    type: publisher
+    feed_url: null   # legacy rssfeed URL returned 404
+    website: https://www.newindianexpress.com
+    independence_group: newindianexpress
+    telangana_specific: true
+    enabled: false
