@@ -9,9 +9,10 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from app.database import Database, as_utc, utcnow
-from app.email_sender import EmailSender, render
+from app.email_sender import render
 from app.logging_setup import setup_logging
-from app.pipeline import analyze_pending, cited_sources, deliver, evidence_summary, is_ai, make_llm, rank_key
+from app.pipeline import (analyze_pending, cited_sources, deliver_all, evidence_summary, is_ai, make_llm,
+                          make_senders, rank_key, translate_backlog)
 from app.relevance import Tagger
 from app.settings import Settings, get_settings
 
@@ -81,18 +82,20 @@ def run(settings: Settings, *, force: bool = False) -> int:
     run_id = db.start_run("digest")
     try:
         # Make sure everything in the window has a summary (bounded by the AI budget).
-        analyze_pending(settings, db, make_llm(settings, db), Tagger(settings.topics))
+        llm = make_llm(settings, db)
+        translate_backlog(settings, db, llm)
+        analyze_pending(settings, db, llm, Tagger(settings.topics))
         ctx = build_digest(settings, db)
         key = ctx["brief_id"] + (f":forced:{utcnow():%H%M%S}" if force else "")
         subject = f"Telangana News Brief | {ctx['date_label']}"
-        res = deliver(settings, db, EmailSender(settings), key=key, type_="digest", recipient_group="team",
-                      recipients=settings.team_recipients, subject=subject,
-                      html=render("digest.html", **ctx), text=render("digest.txt", **ctx), story_id=None)
-        if res is None:
+        results = deliver_all(settings, db, make_senders(settings), key=key, type_="digest", recipient_group="team",
+                              subject=subject, html=render("digest.html", **ctx), text=render("digest.txt", **ctx),
+                              telegram_html=render("telegram_digest.html", **ctx), story_id=None)
+        if not results:
             log.info("digest for %s already handled; nothing sent", ctx["date_label"])
-        else:
+        for res in results:
             log.info("digest %s: %s %s", ctx["date_label"], res.status, res.preview_path or res.provider_message_id)
-        db.finish_run(run_id, status="ok", items_seen=ctx["total"], items_added=1 if res else 0)
+        db.finish_run(run_id, status="ok", items_seen=ctx["total"], items_added=len(results))
         return 0
     except Exception as exc:
         log.exception("digest run failed")

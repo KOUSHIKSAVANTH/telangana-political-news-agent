@@ -1,0 +1,36 @@
+{# Blank lines separate blocks: long briefs are split into several messages only at blank lines. #}
+{% macro item_tg(item) -%}
+{% if item.story.priority in ('critical', 'high') %}<b>[{{ item.story.priority|upper }}]</b> {% endif %}<b>{{ item.story.title }}</b>
+{{ item.story.summary }}
+{% if item.story.why_it_matters %}
+<i>Comms:</i> {{ item.story.why_it_matters }}
+{% endif %}
+{{ item.story.verification_status }}{% if item.story.districts %} · {{ item.story.districts|join(', ') }}{% endif %} · {% for a in item.sources %}<a href="{{ a|link }}">{{ a.publisher }}</a>{% if not loop.last %}, {% endif %}{% endfor %}
+{%- endmacro %}
+📰 <b>TELANGANA NEWS BRIEF · {{ date_label }}</b>
+{{ total }} development(s) from {{ sources_count }} source(s), last 24 hours.
+{% if light_news %}
+Light news day: few credible developments; nothing added to fill space.
+{% endif %}
+{% if follow_ups %}
+
+<b>━━ FOLLOW-UPS TO EARLIER ALERTS ━━</b>
+{% for item in follow_ups %}
+
+{{ item_tg(item) }}
+{% endfor %}
+{% endif %}
+{% for section in sections %}
+
+<b>━━ {{ section.title|upper }} ━━</b>
+{% for item in section['items'] %}
+
+{{ item_tg(item) }}
+{% endfor %}
+{% endfor %}
+{% if not sections and not follow_ups %}
+
+No credible Telangana political developments were collected in this window.
+{% endif %}
+
+<i>{{ brief_id }} · automated monitoring · verify before any public statement.</i>

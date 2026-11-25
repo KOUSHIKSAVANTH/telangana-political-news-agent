@@ -37,7 +37,8 @@ class LLMBudget:
 def make_llm(settings: Settings, db: Database) -> LLMProcessor | None:
     provider = settings.llm_provider
     if provider is None:
-        log.info("no AI key set (GEMINI_API_KEY / GROQ_API_KEY): using heuristic (excerpt-based) analysis")
+        log.info("AI off (LLM_PROVIDER=none or no GROQ_API_KEY/GEMINI_API_KEY): "
+                 "using keyword-only analysis with publisher excerpts")
         return None
     cfg = settings.pipeline[provider]
     budget = LLMBudget(db, provider, cfg["max_calls_per_run"], cfg["max_calls_per_day"])
@@ -52,6 +53,7 @@ def make_llm(settings: Settings, db: Database) -> LLMProcessor | None:
             raise RuntimeError("LLM_PROVIDER=gemini but GEMINI_API_KEY is not set")
         llm = GeminiProcessor(settings.gemini_api_key, settings.gemini_model, **common)
         model = settings.gemini_model
+    llm.glossary = dict(settings.topics.get("translation_glossary") or {})
     log.info("AI analysis via %s (%s)", provider, model)
     return llm
 
@@ -117,13 +119,19 @@ class AnalysisStats:
 def analyze_pending(settings: Settings, db: Database, llm: LLMProcessor | None, tagger: Tagger,
                     *, limit: int = 500) -> AnalysisStats:
     stats = AnalysisStats()
-    for story in db.stories_needing_analysis(limit):
+    # With AI on, recent keyword-mode stories are upgraded too (most important first).
+    since = utcnow() - timedelta(hours=settings.pipeline["clustering"]["window_hours"]) if llm else None
+    budget_out = False
+    for story in db.stories_needing_analysis(limit, ai_upgrade_since=since):
+        already = story.get("analysis_source")
+        if budget_out and already:
+            continue  # AI budget used up: keep the existing analysis, upgrade on a later run
         evidence = db.story_evidence(story["id"])
         if not evidence:
             db.save_analysis(story["id"])
             continue
         result: dict[str, Any] | None = None
-        if llm is not None:
+        if llm is not None and not budget_out:
             try:
                 a = llm.analyze_story(evidence, story.get("summary") if is_ai(story.get("analysis_source")) else None)
                 result = {
@@ -137,12 +145,15 @@ def analyze_pending(settings: Settings, db: Database, llm: LLMProcessor | None, 
                 }
                 stats.ai += 1
             except LLMUnavailable as exc:
-                if "budget" not in str(exc):
+                if "budget" in str(exc):
+                    budget_out = True
+                    log.info("AI call budget reached; remaining stories wait for the next run")
+                else:
                     stats.errors.append(f"story {story['id']}: {exc}")
                     log.warning("AI analysis failed for story %s: %s", story["id"], exc)
         if result is None:
-            if is_ai(story.get("analysis_source")):
-                # Keep the earlier grounded AI analysis; retry AI next run.
+            if is_ai(already) or (llm is not None and already):
+                # Keep the earlier analysis (AI, or keyword-mode awaiting an AI upgrade); retry next run.
                 continue
             result = heuristic_analysis(evidence, tagger, evidence_summary(settings, evidence))
             stats.heuristic += 1
@@ -164,6 +175,27 @@ def analyze_pending(settings: Settings, db: Database, llm: LLMProcessor | None, 
         db.save_analysis(story["id"], **values)
         stats.analyzed_ids.append(story["id"])
     return stats
+
+
+def translate_backlog(settings: Settings, db: Database, llm: LLMProcessor | None, *, limit: int = 120) -> int:
+    """Translate recent Telugu headlines that have no English title yet (20 per AI call)."""
+    if llm is None:
+        return 0
+    since = utcnow() - timedelta(hours=settings.pipeline["clustering"]["window_hours"])
+    items = db.untranslated_telugu(since, limit)
+    done = 0
+    for i in range(0, len(items), 20):
+        try:
+            got = llm.translate_titles(items[i:i + 20])
+        except LLMUnavailable as exc:
+            log.warning("Telugu title translation stopped: %s", exc)
+            break
+        for article_id, title_en in got.items():
+            db.set_article_title_en(article_id, title_en)
+        done += len(got)
+    if items:
+        log.info("translated %d of %d pending Telugu headlines", done, len(items))
+    return done
 
 
 def cited_sources(story: dict[str, Any], evidence: list[dict[str, Any]], n: int = 3) -> list[dict[str, Any]]:
@@ -205,6 +237,49 @@ def deliver(settings: Settings, db: Database, sender: EmailSender, *, key: str, 
         raise
     db.finish_notification(key, status=result.status, provider_message_id=result.provider_message_id)
     return result
+
+
+TELEGRAM_KEY_PREFIX = "tg:"
+
+
+def make_senders(settings: Settings) -> dict[str, Any]:
+    """One sender per enabled channel (DELIVERY_CHANNELS)."""
+    senders: dict[str, Any] = {}
+    if "email" in settings.delivery_channels:
+        senders["email"] = EmailSender(settings)
+    if "telegram" in settings.delivery_channels:
+        from app.telegram_sender import TelegramSender
+
+        senders["telegram"] = TelegramSender(settings)
+    return senders
+
+
+def deliver_all(settings: Settings, db: Database, senders: dict[str, Any], *, key: str, type_: str,
+                recipient_group: str, subject: str, html: str, text: str, telegram_html: str,
+                story_id: int | None) -> list[SendResult]:
+    """Deliver to every enabled channel. Each channel has its own idempotency key
+    (Telegram: 'tg:' + key), so a failure on one channel never blocks or re-sends the other.
+    Raises after trying all channels if any of them failed."""
+    results, failures = [], []
+    for channel, sender in senders.items():
+        if channel == "telegram":
+            chats = (settings.telegram_reviewer_chat_ids if recipient_group == "reviewer"
+                     else settings.telegram_team_chat_ids)
+            args = dict(key=TELEGRAM_KEY_PREFIX + key, recipients=chats, html=telegram_html)
+        else:
+            recips = settings.reviewer_recipients if recipient_group == "reviewer" else settings.team_recipients
+            args = dict(key=key, recipients=recips, html=html)
+        try:
+            res = deliver(settings, db, sender, type_=type_, recipient_group=recipient_group, subject=subject,
+                          text=text, story_id=story_id, **args)
+        except Exception as exc:  # already logged and recorded as failed by deliver()
+            failures.append(f"{channel}: {type(exc).__name__}: {exc}")
+            continue
+        if res is not None:
+            results.append(res)
+    if failures:
+        raise RuntimeError("delivery failed on " + "; ".join(failures))
+    return results
 
 
 def window_since(hours: float):

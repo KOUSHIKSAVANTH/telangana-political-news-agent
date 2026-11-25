@@ -1,0 +1,24 @@
+{% if review %}
+⚠️ <b>REVIEW REQUIRED</b>: not sent to the team. {{ decision_reason }}. Verify before forwarding.
+
+{% endif %}
+{{ '🔴' if story.priority == 'critical' else '🟠' }} <b>TELANGANA ALERT · {{ story.priority|upper }} · {{ story.verification_status|upper }}</b>
+<b>{{ story.title }}</b>
+
+{{ story.summary }}
+{% if story.why_it_matters %}
+
+<b>Why it matters:</b> {{ story.why_it_matters }}
+{% endif %}
+
+<b>Next step:</b> {{ next_step }}
+📍 {{ story.districts|join(', ') if story.districts else 'Place not stated' }} · 🕒 {{ published|ist }}
+✅ {{ evidence.independent_sources }} independent source(s){% if evidence.has_official %}, incl. official{% endif %}
+
+
+<b>Sources</b>
+{% for a in sources %}
+{{ loop.index }}. <a href="{{ a|link }}">{{ a.title }}</a> ({{ a.publisher }}{% if a.language == 'te' and a.title_en %}; EN: {{ a.title_en }}{% endif %})
+{% endfor %}
+
+<i>Alert {{ alert_id }} · {{ 'AI summary from cited sources' if story.analysis_source not in (None, 'heuristic') else 'Publisher excerpt (AI unavailable)' }} · verify before any public statement.</i>

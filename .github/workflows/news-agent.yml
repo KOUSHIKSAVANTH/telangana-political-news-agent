@@ -1,0 +1,109 @@
+# Free scheduler: runs the agent on GitHub's servers (no Google Cloud needed).
+# Setup: README → "Running it free with GitHub Actions". Needs DATABASE_URL (Supabase) because
+# every run starts on a fresh machine.
+#
+# Times are UTC.  0 * * * *  = monitor every hour
+#                 30 3 * * * = daily brief at 09:00 IST
+# GitHub may start scheduled runs a few minutes late, and pauses schedules in repositories
+# with no activity for 60 days.
+name: news-agent
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+    - cron: "30 3 * * *"
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "What to run"
+        type: choice
+        options: [monitor, digest]
+        default: monitor
+      force:
+        description: "Digest only: rebuild even if today's brief was already handled"
+        type: boolean
+        default: false
+
+# Never run two jobs at once (they share the database); queue instead of cancelling.
+concurrency:
+  group: news-agent
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: telangana-news-agent
+    env:
+      # Non-secret switches: Settings → Secrets and variables → Actions → Variables
+      DRY_RUN: ${{ vars.DRY_RUN || 'true' }}
+      DELIVERY_CHANNELS: ${{ vars.DELIVERY_CHANNELS || 'email' }}
+      LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
+      GROQ_MODEL: ${{ vars.GROQ_MODEL }}
+      # Secrets: Settings → Secrets and variables → Actions → Secrets
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+      EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
+      EMAIL_TEAM_RECIPIENTS: ${{ secrets.EMAIL_TEAM_RECIPIENTS }}
+      EMAIL_REVIEWER_RECIPIENTS: ${{ secrets.EMAIL_REVIEWER_RECIPIENTS }}
+      EMAIL_RECIPIENT_ALLOWLIST: ${{ secrets.EMAIL_RECIPIENT_ALLOWLIST }}
+      GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+      GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+      GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_TEAM_CHAT_IDS: ${{ secrets.TELEGRAM_TEAM_CHAT_IDS }}
+      TELEGRAM_REVIEWER_CHAT_IDS: ${{ secrets.TELEGRAM_REVIEWER_CHAT_IDS }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: telangana-news-agent/pyproject.toml
+
+      - name: Install
+        run: pip install .
+
+      - name: Check database secret
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL secret is not set. A hosted database (Supabase) is required: each run starts on a fresh machine."
+            exit 1
+          fi
+
+      - name: Pick job
+        id: pick
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "job=${{ inputs.job }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.schedule }}" = "30 3 * * *" ]; then
+            echo "job=digest" >> "$GITHUB_OUTPUT"
+          else
+            echo "job=monitor" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Monitor (collect, analyse, alerts)
+        if: steps.pick.outputs.job == 'monitor'
+        run: python -m app.monitor
+
+      - name: Daily brief
+        if: steps.pick.outputs.job == 'digest'
+        run: python -m app.digest ${{ inputs.force && '--force' || '' }}
+
+      # Dry-run previews (contain recipient addresses), so only kept for private repositories.
+      - name: Upload dry-run previews
+        if: always() && env.DRY_RUN == 'true' && github.event.repository.private
+        uses: actions/upload-artifact@v4
+        with:
+          name: previews-${{ steps.pick.outputs.job }}-${{ github.run_id }}
+          path: telangana-news-agent/out/
+          if-no-files-found: ignore
+          retention-days: 7

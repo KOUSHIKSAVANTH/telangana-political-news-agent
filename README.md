@@ -1,15 +1,15 @@
 # Telangana Political News Agent
 
-An email-only monitoring agent for **political communications teams in Telangana**. It reads English
+A news monitoring agent for **political communications teams in Telangana**. It reads English
 and Telugu news, works out which reports describe the same event, checks how well each story is
-corroborated, and emails the team:
+corroborated, and sends the team, by **email** and/or **Telegram**:
 
 - **A daily brief at 09:00 IST**: the most important political and governance developments of the
   last 24 hours, grouped by section, with source links.
 - **Cautious breaking alerts**: only for high-priority stories that are recent and backed by
   independent sources. By default every alert goes to a human reviewer first.
 
-There is no website, dashboard or chat bot: the output is email.
+There is no website or dashboard. The output is email and, optionally, a send-only Telegram bot.
 
 > The code lives in [`telangana-news-agent/`](telangana-news-agent/). Run all commands below from
 > inside that folder. The original specification is
@@ -28,14 +28,15 @@ There is no website, dashboard or chat bot: the output is email.
 7. [Running it](#7-running-it)
 8. [Setting up the database (Supabase)](#8-setting-up-the-database-supabase)
 9. [Setting up email sending (Gmail)](#9-setting-up-email-sending-gmail)
-10. [Running it on a schedule (Google Cloud)](#10-running-it-on-a-schedule-google-cloud)
-11. [Customising sources, keywords and rules](#11-customising-sources-keywords-and-rules)
-12. [Safety and reliability](#12-safety-and-reliability)
-13. [Costs and quotas](#13-costs-and-quotas)
-14. [Troubleshooting](#14-troubleshooting)
-15. [Project layout](#15-project-layout)
-16. [Development and tests](#16-development-and-tests)
-17. [Known limitations and status](#17-known-limitations-and-status)
+10. [Telegram delivery (optional, free)](#10-telegram-delivery-optional-free)
+11. [Running it on a schedule](#11-running-it-on-a-schedule)
+12. [Customising sources, keywords and rules](#12-customising-sources-keywords-and-rules)
+13. [Safety and reliability](#13-safety-and-reliability)
+14. [Costs and quotas](#14-costs-and-quotas)
+15. [Troubleshooting](#15-troubleshooting)
+16. [Project layout](#16-project-layout)
+17. [Development and tests](#17-development-and-tests)
+18. [Known limitations and status](#18-known-limitations-and-status)
 
 ---
 
@@ -67,7 +68,7 @@ These are dropped in two stages:
 | Never send the same email twice | Every email claims a unique key before it is sent, so retries and re-runs are safe. |
 | Bounded cost | Hard caps on AI calls per run and per day, on search credits, and on alerts per run and per day. |
 | Safe by default | Dry-run is the default, alerts go to a reviewer, and live sends are allowed only to an allowlist. |
-| Runs without a computer switched on | Google Cloud Run Jobs, triggered by Cloud Scheduler. |
+| Runs without a computer switched on | GitHub Actions (free) or Google Cloud Run Jobs with Cloud Scheduler. |
 | Editable without coding | Sources, keywords, districts, thresholds and sections are YAML files in `config/`. |
 
 ---
@@ -122,7 +123,7 @@ Tavily search (optional) ┴─> clean + canonical URL ─> drop exact duplicate
    ─> group into stories (title similarity, 36-hour window)
    ─> AI: structured analysis (schema-validated JSON; cited IDs must exist)
    ─> verification by code (independent outlets, wire copies collapsed, official sources)
-   ─> alert policy (priority, age, cooldown, caps, sensitive → reviewer) ─> Gmail API
+   ─> alert policy (priority, age, cooldown, caps, sensitive → reviewer) ─> Gmail API and/or Telegram
 ```
 
 There are two commands:
@@ -157,7 +158,8 @@ Docker is **not** needed: the cloud deployment builds the container image on Goo
 | **Groq** *or* **Google AI Studio (Gemini)** | AI summaries, Telugu translation, priority | Free tiers available |
 | Supabase | Database for cloud runs (locally, a SQLite file is used) | Free tier |
 | Google account with Gmail | Sending emails | Free (Workspace account recommended) |
-| Google Cloud project with billing | Scheduled cloud runs | Free trial / low usage; billing must be enabled |
+| Telegram *(optional)* | Alerts and brief in a Telegram group | Free |
+| GitHub *or* Google Cloud | Scheduled runs | GitHub Actions free; Google Cloud needs billing enabled |
 | Tavily *(optional)* | Extra web search | Free tier |
 
 You can try everything locally with **just Python and one AI key**, or with no key at all.
@@ -230,6 +232,9 @@ Leave a line blank to switch that setting off. Paste values directly after `=` w
 | `EMAIL_REVIEWER_RECIPIENTS` | Comma-separated list. Receives alerts that need a human check (all alerts in review mode). |
 | `EMAIL_RECIPIENT_ALLOWLIST` | Comma-separated list. **The agent refuses to email anyone not on it.** Include every team and reviewer address. |
 | `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN` | Gmail permission (Option A, recommended). |
+| `DELIVERY_CHANNELS` | `email` (default), `telegram`, or `email,telegram` |
+| `TELEGRAM_BOT_TOKEN` | Bot token from @BotFather ([section 10](#10-telegram-delivery-optional-free)) |
+| `TELEGRAM_TEAM_CHAT_IDS`, `TELEGRAM_REVIEWER_CHAT_IDS` | Comma-separated chat IDs. Messages only go to these chats. |
 | `GMAIL_SERVICE_ACCOUNT_JSON`, `GMAIL_DELEGATED_USER` | Option B, Workspace domain-wide delegation (needs an admin). Leave blank if you use Option A. |
 
 ---
@@ -326,33 +331,107 @@ If the sender is a company mailbox, check with IT before connecting an app to it
 
 ---
 
-## 10. Running it on a schedule (Google Cloud)
+## 10. Telegram delivery (optional, free)
+
+Alerts and the brief can also go to a **Telegram group or channel**, which gives instant phone
+notifications. Use email, Telegram, or both: `DELIVERY_CHANNELS=email,telegram`.
+
+1. In Telegram, message **@BotFather**, send `/newbot`, and follow the prompts. Copy the **bot token**
+   into `.env` as `TELEGRAM_BOT_TOKEN`.
+2. Create a **private group** (or channel) for the team and add the bot. For a channel, make the bot
+   an **admin** with permission to post. Optionally create a second group for the reviewer.
+3. Send any message in the group, then run:
+   ```bash
+   python scripts/telegram_setup.py
+   ```
+   It checks the token and lists the chats the bot has seen, with their IDs. Group and channel IDs
+   are negative, e.g. `-1001234567890`.
+4. Put the IDs in `.env`: `TELEGRAM_TEAM_CHAT_IDS` (brief and approved alerts) and
+   `TELEGRAM_REVIEWER_CHAT_IDS` (alerts needing review). Set `DELIVERY_CHANNELS=email,telegram` or
+   `telegram`.
+5. Test: `python scripts/telegram_setup.py --test <chat-id>`.
+
+How it behaves:
+- **Format:** alerts are one compact message (headline, status, summary, next step, source links).
+  Long briefs are split into several messages at story boundaries, because of Telegram's
+  4,096-character limit.
+- **Same safety rules as email:** dry-run writes `out/*.telegram.txt` instead of sending, messages
+  go only to the configured chat IDs, and each message is sent once (separate once-only key per
+  channel). An alert sent on both channels counts as **one** alert for cooldowns and caps.
+- **Send-only:** the bot never reads or replies to messages.
+- **Privacy:** Telegram bot and group messages are stored on Telegram's servers and are **not
+  end-to-end encrypted**. Use a private group, limit who can add members, and decide whether that
+  suits your team's internal notes.
+
+---
+
+## 11. Running it on a schedule
+
+Pick **one** option. Both run the monitor and the 09:00 IST brief without your computer.
+
+### Option A: GitHub Actions (free, no card)
+
+The workflow [`.github/workflows/news-agent.yml`](.github/workflows/news-agent.yml) runs the
+**monitor every hour** and the **brief at 09:00 IST** on GitHub's servers.
+
+1. Set up Supabase ([section 8](#8-setting-up-the-database-supabase)). It's **required**, because each
+   run starts on a fresh machine with no local database.
+2. On GitHub, open the repository → **Settings → Secrets and variables → Actions**.
+3. **Secrets** tab → **New repository secret** for each value you use. Copy the values exactly as in
+   your `.env`:
+   `DATABASE_URL`, `GROQ_API_KEY` (or `GEMINI_API_KEY`), `EMAIL_SENDER`, `EMAIL_TEAM_RECIPIENTS`,
+   `EMAIL_REVIEWER_RECIPIENTS`, `EMAIL_RECIPIENT_ALLOWLIST`, `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`,
+   `GMAIL_REFRESH_TOKEN`, and if you use Telegram, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_TEAM_CHAT_IDS`,
+   `TELEGRAM_REVIEWER_CHAT_IDS`. Optional: `TAVILY_API_KEY`.
+4. **Variables** tab (not secret) → `DRY_RUN` = `true` to start, and `DELIVERY_CHANNELS` = `email`,
+   `telegram` or `email,telegram`.
+5. **Actions** tab → **news-agent** → **Run workflow** to test it by hand (choose `monitor` or
+   `digest`). In dry-run on a private repository, the previews are attached to the run as a
+   downloadable artifact.
+6. When the previews look right, set the `DRY_RUN` variable to `false`.
+
+Things to know:
+- **Minutes:** private repositories get 2,000 free minutes a month. Hourly monitoring plus the daily
+  brief uses roughly 1,000–1,500. Public repositories have no limit. Don't run it every 15 minutes
+  on a private repository.
+- **Timing:** GitHub may start scheduled runs a few minutes late, and **pauses schedules after 60 days
+  without repository activity**. Re-enable them from the Actions tab.
+- **Changing the schedule:** edit the `cron` lines in the workflow file. They are in UTC: `30 3 * * *`
+  is 09:00 IST.
+- **Feeds:** runs come from GitHub's servers (usually in the US). If a news site blocks them, it shows
+  up as a failing source in the brief's footer.
+
+### Option B: Google Cloud (Cloud Run Jobs + Cloud Scheduler)
 
 Two **Cloud Run Jobs** (`news-monitor`, `news-digest`) share one container image. Two **Cloud
-Scheduler** jobs start them on an `Asia/Kolkata` schedule. Your computer doesn't need to be on.
+Scheduler** jobs start them on an `Asia/Kolkata` schedule. This option is better if you need
+on-the-dot timing, runs every 15 minutes, or company infrastructure.
 
 **Prerequisites:**
 - A Google Cloud project **with billing enabled**. Cloud Run, Scheduler and Secret Manager can't be
   turned on without it, even if usage stays within free tiers. New accounts can use the free trial
   credit.
 - The `gcloud` CLI, signed in: `gcloud init`.
-- Supabase and Gmail set up as above, and the dry-run output reviewed.
+- Supabase and Gmail (and/or Telegram) set up as above, and the dry-run output reviewed.
 
 **Full step-by-step guide:** [`telangana-news-agent/deployment/cloud_run_scheduler.md`](telangana-news-agent/deployment/cloud_run_scheduler.md).
 It covers enabling the services, least-privilege service accounts, storing keys in **Secret
 Manager** (never in the image), building the image with Cloud Build, creating the jobs, the
-schedules, failure alerts and going live.
+schedules, failure alerts and going live. For Telegram, also add `TELEGRAM_BOT_TOKEN` and the chat
+IDs as secrets, and `DELIVERY_CHANNELS` to the job settings.
 
 **Choosing the monitor frequency:** the spec uses every 15 minutes. On a free AI tier, every 30–60
 minutes uses far fewer AI calls; the daily caps apply either way.
 
-**Going live:** the jobs start with `DRY_RUN=true`. After the team approves a test brief, switch to
+### Going live (either option)
+
+The schedules start with `DRY_RUN=true`. After the team approves a test brief, switch to
 `DRY_RUN=false`. Keep `mode: review` in `config/alert_rules.yaml` until a pilot week shows acceptable
 false-alarm rates.
 
 ---
 
-## 11. Customising sources, keywords and rules
+## 12. Customising sources, keywords and rules
 
 You don't need to touch any code: edit the YAML files and re-run (or rebuild the image for the cloud).
 
@@ -372,7 +451,7 @@ anywhere in the text, because Telugu attaches suffixes (e.g. తెలంగా�
 
 ---
 
-## 12. Safety and reliability
+## 13. Safety and reliability
 
 - **Grounded AI:** the model sees only stored evidence. Output must match a strict JSON schema, and any
   cited article ID not in the input is rejected. If the AI fails, the agent falls back to the
@@ -394,7 +473,7 @@ anywhere in the text, because Telugu attaches suffixes (e.g. తెలంగా�
 
 ---
 
-## 13. Costs and quotas
+## 14. Costs and quotas
 
 | Item | Default limit | Where to change |
 |---|---|---|
@@ -404,13 +483,14 @@ anywhere in the text, because Telugu attaches suffixes (e.g. తెలంగా�
 | Alerts | 3 per run, 12 per day | `config/alert_rules.yaml` |
 | Stored articles | 45 days | `config/pipeline.yaml` → `retention` |
 
-Google Cloud at this scale (two small scheduled jobs) usually costs little or nothing, but **set a
+GitHub Actions: about 1,000–1,500 of the 2,000 free monthly minutes for a private repository at
+hourly monitoring. Telegram: free. Google Cloud at this scale (two small scheduled jobs) usually costs little or nothing, but **set a
 billing budget alert**. It notifies you but doesn't cap spending. Check current free-tier limits for
 Groq (console.groq.com/settings/limits), Gemini, Supabase and Cloud Run before going live.
 
 ---
 
-## 14. Troubleshooting
+## 15. Troubleshooting
 
 | Problem | Fix |
 |---|---|
@@ -424,13 +504,18 @@ Groq (console.groq.com/settings/limits), Gemini, Supabase and Cloud Run before g
 | Groq model not available | Run `python -m app.groq_processor` to list your models, then set `GROQ_MODEL`. |
 | `telangana.gov.in` TLS error | Some networks are served an invalid certificate for this site. The agent won't bypass TLS. It is reported in the brief's footer; retry from the cloud. |
 | Brief says "already produced" | One brief per IST date. Use `python -m app.digest --force` to rebuild. |
+| `telegram_setup.py` shows no chats | Send a message in the group *after* adding the bot, then re-run. For a channel, make the bot an admin. Telegram keeps these updates for 24 hours. |
+| Telegram `chat not found` / `bot was kicked` | Wrong chat ID (include the minus sign), or the bot was removed from the group. |
+| GitHub Actions fails at "Check database secret" | Add the `DATABASE_URL` secret. A hosted database is required on GitHub's servers. |
+| Scheduled GitHub runs stopped | GitHub pauses schedules after 60 days without repository activity. Re-enable them in the Actions tab. |
 | Telugu text garbled in a Windows console | Set `PYTHONIOENCODING=utf-8` (the email files are fine). |
 
 ---
 
-## 15. Project layout
+## 16. Project layout
 
 ```
+.github/workflows/news-agent.yml # free scheduler (GitHub Actions)
 README.md                       # this file
 telangana_news_email_agent.md   # original project specification
 telangana-news-agent/           # the agent: run all commands from inside this folder
@@ -448,15 +533,18 @@ telangana-news-agent/           # the agent: run all commands from inside this f
 │   ├── gemini_processor.py # shared LLM prompts/validation + Gemini provider
 │   ├── groq_processor.py   # Groq provider + key check (python -m app.groq_processor)
 │   ├── email_sender.py     # dry-run files or Gmail API; allowlist enforcement
+│   ├── telegram_sender.py  # Telegram Bot API (send-only); message splitting
 │   ├── database.py         # SQLAlchemy schema/queries (SQLite locally, Postgres in prod)
 │   ├── models.py           # typed models incl. the AI output schema
 │   ├── settings.py         # .env + YAML loading
 │   ├── logging_setup.py    # text logs locally, JSON in the cloud
-│   └── templates/          # HTML + text email templates
+│   └── templates/          # email (HTML + text) and Telegram templates
 ├── config/                 # sources, topics/scope, alert rules, pipeline settings
 ├── migrations/001_init.sql # Postgres schema (generated) with RLS enabled
 ├── deployment/             # Cloud Run Jobs + Cloud Scheduler guide
-├── scripts/gmail_auth.py   # one-time Gmail permission helper
+├── scripts/
+│   ├── gmail_auth.py       # one-time Gmail permission helper
+│   └── telegram_setup.py   # check bot token, find chat IDs, send a test message
 ├── tests/                  # pytest suite (no network or keys needed)
 ├── Dockerfile
 ├── pyproject.toml
@@ -465,10 +553,10 @@ telangana-news-agent/           # the agent: run all commands from inside this f
 
 ---
 
-## 16. Development and tests
+## 17. Development and tests
 
 ```bash
-pytest            # 73 tests; network and AI calls are mocked
+pytest            # 89 tests; network, AI and Telegram calls are mocked
 ```
 
 The tests cover:
@@ -479,6 +567,8 @@ The tests cover:
 - the Groq and Gemini providers: schema mode and fallback, rate-limit retries, rejection of invented
   IDs, budgets
 - political-scope filtering
+- Telegram delivery: message splitting, dry-run, chat restrictions, rate limits, token redaction,
+  and multi-channel delivery
 
 After changing tables in `app/database.py`, regenerate the migration:
 
@@ -488,7 +578,7 @@ python -m app.database --emit-sql > migrations/001_init.sql
 
 ---
 
-## 17. Known limitations and status
+## 18. Known limitations and status
 
 **Limitations:**
 - Stories are grouped by headline similarity, so some wrong merges or splits remain. Grouping across
@@ -504,5 +594,6 @@ python -m app.database --emit-sql > migrations/001_init.sql
 - [x] Political-only scope filter
 - [x] Groq and Gemini providers with budgets; keyword fallback
 - [x] Dry-run previews; Supabase schema; Gmail sending; idempotent delivery
-- [x] Container and Cloud Run / Scheduler deployment guide
+- [x] Telegram delivery (optional)
+- [x] Free scheduling with GitHub Actions; container and Cloud Run / Scheduler guide
 - [ ] Cloud deployment and a one-week pilot to tune alert thresholds

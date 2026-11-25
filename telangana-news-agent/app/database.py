@@ -23,6 +23,8 @@ from sqlalchemy import (
     Table,
     Text,
     UniqueConstraint,
+    and_,
+    case,
     create_engine,
     delete,
     func,
@@ -292,13 +294,37 @@ class Database:
             conn.execute(update(stories).where(stories.c.id == story_id)
                          .values(needs_analysis=True, updated_at=now))
 
-    def stories_needing_analysis(self, limit: int) -> list[dict[str, Any]]:
+    def stories_needing_analysis(self, limit: int, *, ai_upgrade_since: datetime | None = None
+                                 ) -> list[dict[str, Any]]:
+        """Stories to (re)analyse, most important first: priority, then number of articles
+        (more outlets = more likely in the brief), then most recently updated.
+
+        With `ai_upgrade_since` (an AI provider is configured), recent stories that only have a
+        keyword-mode ('heuristic') analysis are included too, so they get an AI summary."""
+        cond = stories.c.needs_analysis.is_(True)
+        if ai_upgrade_since is not None:
+            cond = or_(cond, and_(stories.c.analysis_source == "heuristic",
+                                  stories.c.updated_at >= ai_upgrade_since))
+        n_articles = (select(func.count()).select_from(story_articles)
+                      .where(story_articles.c.story_id == stories.c.id).scalar_subquery())
+        rank = case({"critical": 0, "high": 1, "normal": 2}, value=stories.c.priority, else_=3)
         with self.engine.connect() as conn:
             rows = conn.execute(
-                select(stories).where(stories.c.needs_analysis.is_(True))
-                .order_by(stories.c.updated_at.desc()).limit(limit)
+                select(stories).where(cond)
+                .order_by(rank, n_articles.desc(), stories.c.updated_at.desc()).limit(limit)
             ).mappings().all()
             return [dict(r) for r in rows]
+
+    def untranslated_telugu(self, since: datetime, limit: int = 200) -> list[tuple[int, str]]:
+        """Recent relevant Telugu articles without an English title, newest first."""
+        with self.engine.connect() as conn:
+            rows = conn.execute(
+                select(articles.c.id, articles.c.title).where(
+                    articles.c.language == "te", articles.c.relevant.is_(True), articles.c.title_en.is_(None),
+                    func.coalesce(articles.c.published_at, articles.c.discovered_at) >= since,
+                ).order_by(articles.c.id.desc()).limit(limit)
+            ).all()
+            return [(int(r[0]), r[1]) for r in rows]
 
     def get_story(self, story_id: int) -> dict[str, Any] | None:
         with self.engine.connect() as conn:
@@ -355,8 +381,11 @@ class Database:
             stmt = self._insert(notifications).values(
                 idempotency_key=key, type=type_, recipient_group=recipient_group, subject=subject,
                 story_id=story_id, status="pending", created_at=utcnow(),
-            ).on_conflict_do_nothing(index_elements=[notifications.c.idempotency_key])
-            if conn.execute(stmt).rowcount == 1:
+            ).on_conflict_do_nothing(index_elements=[notifications.c.idempotency_key]
+                                     ).returning(notifications.c.id)
+            # RETURNING yields a row only if we inserted it. (rowcount is unreliable for
+            # INSERT .. ON CONFLICT on Postgres drivers, which made every claim look taken.)
+            if conn.execute(stmt).first() is not None:
                 return True
             # A send that definitely failed (e.g. auth error) may be retried; sent/pending never are.
             res = conn.execute(update(notifications).where(
@@ -408,9 +437,11 @@ class Database:
             return {int(r[0]) for r in rows}
 
     def count_alerts_since(self, since: datetime) -> int:
+        """Distinct alerts: one alert sent by email AND Telegram ('tg:' key prefix) counts once."""
+        base_key = func.replace(notifications.c.idempotency_key, "tg:", "")
         with self.engine.connect() as conn:
             return int(conn.execute(
-                select(func.count()).select_from(notifications).where(
+                select(func.count(func.distinct(base_key))).select_from(notifications).where(
                     notifications.c.type.in_(["breaking", "review"]),
                     notifications.c.status.in_(["sent", "dry_run", "pending"]),
                     notifications.c.created_at >= since,

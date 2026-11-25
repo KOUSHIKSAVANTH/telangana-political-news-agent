@@ -13,11 +13,12 @@ from app.alerts import decide
 from app.cluster import Candidate, best_match, match_tokens, story_key
 from app.database import Database, as_utc, utcnow
 from app.dedupe import content_hash
-from app.email_sender import EmailSender, render
+from app.email_sender import render
 from app.gemini_processor import LLMUnavailable
 from app.logging_setup import setup_logging
 from app.models import FeedItem
-from app.pipeline import (analyze_pending, cited_sources, deliver, evidence_summary, make_llm)
+from app.pipeline import (analyze_pending, cited_sources, deliver_all, evidence_summary, make_llm, make_senders,
+                          translate_backlog)
 from app.relevance import Tagger
 from app.rss_client import fetch_source, make_client
 from app.settings import Settings, get_settings
@@ -110,9 +111,9 @@ def translate_titles(llm, db: Database, new: list[dict[str, Any]]) -> None:
     te = [(a["id"], a["title"]) for a in new if a["language"] == "te"]
     if not llm or not te:
         return
-    for i in range(0, len(te), 40):
+    for i in range(0, len(te), 20):
         try:
-            got = llm.translate_titles(te[i:i + 40])
+            got = llm.translate_titles(te[i:i + 20])
         except LLMUnavailable as exc:
             log.warning("title translation skipped: %s", exc)
             return
@@ -181,7 +182,7 @@ def next_step(story: dict[str, Any], route: str) -> str:
     return "Monitor for official statements; assess whether a response or briefing note is needed."
 
 
-def send_alerts(settings: Settings, db: Database, sender: EmailSender, story_ids: list[int]) -> int:
+def send_alerts(settings: Settings, db: Database, senders: dict[str, Any], story_ids: list[int]) -> int:
     rules = settings.alert_rules
     now = utcnow()
     day_start = now.astimezone(IST).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -198,7 +199,8 @@ def send_alerts(settings: Settings, db: Database, sender: EmailSender, story_ids
             story, summ, rules=rules, now=now,
             last_alert=db.last_alert_for_story(sid, dry_run=settings.dry_run),
             alerts_today=db.count_alerts_since(day_start), alerts_this_run=sent,
-            reviewer_configured=bool(settings.reviewer_recipients) or settings.dry_run,
+            reviewer_configured=(bool(settings.reviewer_recipients) and "email" in senders)
+            or (bool(settings.telegram_reviewer_chat_ids) and "telegram" in senders) or settings.dry_run,
         )
         log.info("story %s [%s/%s]: %s", sid, story["priority"], story["verification_status"], decision.reason)
         if decision.route == "none":
@@ -210,13 +212,14 @@ def send_alerts(settings: Settings, db: Database, sender: EmailSender, story_ids
                    decision_reason=decision.reason, next_step=next_step(story, decision.route),
                    published=story["first_published_at"], detected=min(e["discovered_at"] for e in evidence),
                    checked=now, alert_id=decision.idempotency_key)
-        recipients = settings.reviewer_recipients if review else settings.team_recipients
         try:
-            res = deliver(settings, db, sender, key=decision.idempotency_key, type_="review" if review else "breaking",
-                          recipient_group="reviewer" if review else "team", recipients=recipients, subject=subject,
-                          html=render("breaking.html", **ctx), text=render("breaking.txt", **ctx), story_id=sid)
-        except Exception:
-            continue  # logged + recorded as failed; other alerts still proceed
+            res = deliver_all(settings, db, senders, key=decision.idempotency_key,
+                              type_="review" if review else "breaking", recipient_group="reviewer" if review else "team",
+                              subject=subject, html=render("breaking.html", **ctx), text=render("breaking.txt", **ctx),
+                              telegram_html=render("telegram_breaking.html", **ctx), story_id=sid)
+        except Exception as exc:
+            log.error("alert for story %s: %s", sid, exc)  # recorded as failed; other alerts still proceed
+            continue
         if res:
             sent += 1
     return sent
@@ -240,14 +243,14 @@ def run(settings: Settings) -> int:
         created = cluster_new(settings, db, new)
         log.info("ingest: %d seen, %d new relevant articles, %d new stories", seen, added, created)
 
+        translate_backlog(settings, db, llm)  # older Telugu headlines still without English
         stats = analyze_pending(settings, db, llm, tagger)
         log.info("analysis: %d via AI, %d heuristic", stats.ai, stats.heuristic)
         touched = corroborate(settings, db, tagger, stats.analyzed_ids)
         if touched:
             analyze_pending(settings, db, llm, tagger)
 
-        sender = EmailSender(settings)
-        n_alerts = send_alerts(settings, db, sender, stats.analyzed_ids + touched)
+        n_alerts = send_alerts(settings, db, make_senders(settings), stats.analyzed_ids + touched)
         log.info("alerts delivered: %d (dry_run=%s)", n_alerts, settings.dry_run)
 
         failing = db.failing_sources()

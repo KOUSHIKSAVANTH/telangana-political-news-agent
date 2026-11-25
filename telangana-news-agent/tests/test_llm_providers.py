@@ -120,3 +120,41 @@ def test_provider_selection(monkeypatch, env, expected):
     for k, v in env.items():
         monkeypatch.setenv(k, v)
     assert _llm_provider() == expected
+
+
+def test_rate_limit_replies_do_not_use_budget():
+    counted = []
+    calls = []
+
+    def handler(req):
+        calls.append(1)
+        return httpx.Response(429, headers={"retry-after": "1"}) if len(calls) < 3 else chat(analysis())
+
+    make(handler, on_call=lambda: counted.append(1)).analyze_story(EVIDENCE, None)
+    assert len(calls) == 3 and len(counted) == 1
+
+
+def test_json_validate_failed_is_retried():
+    calls = []
+
+    def handler(req):
+        calls.append(1)
+        if len(calls) == 1:
+            return httpx.Response(400, text='{"error":{"code":"json_validate_failed","failed_generation":""}}')
+        return chat(analysis())
+
+    make(handler).analyze_story(EVIDENCE, None)
+    assert len(calls) == 2
+
+
+def test_translation_glossary_sent_only_when_relevant():
+    prompts = []
+
+    def handler(req):
+        prompts.append(json.loads(req.content)["messages"][1]["content"])
+        return chat({"items": [{"id": 1, "title_en": "Seethakka regrets remarks on Kavitha"}]})
+
+    p = make(handler)
+    p.glossary = {"కవిత": "Kavitha", "సీతక్క": "Seethakka", "కేటీఆర్": "KTR"}
+    p.translate_titles([(1, "కవితపై వ్యాఖ్యలు పొరబాటే: సీతక్క")])
+    assert "కవిత = Kavitha" in prompts[0] and "సీతక్క = Seethakka" in prompts[0] and "KTR" not in prompts[0]

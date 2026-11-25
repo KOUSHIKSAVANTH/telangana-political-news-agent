@@ -61,6 +61,11 @@ class Settings:
     gmail_refresh_token: str | None
     gmail_service_account_json: str | None
     gmail_delegated_user: str | None
+    # --- delivery channels ---
+    delivery_channels: list[str]  # any of: email, telegram
+    telegram_bot_token: str | None
+    telegram_team_chat_ids: list[str]
+    telegram_reviewer_chat_ids: list[str]
     # --- config files ---
     sources: list[dict[str, Any]] = field(repr=False)
     topics: dict[str, Any] = field(repr=False)
@@ -70,6 +75,18 @@ class Settings:
     @property
     def enabled_sources(self) -> list[dict[str, Any]]:
         return [s for s in self.sources if s.get("enabled") and s.get("feed_url")]
+
+
+CHANNELS = ("email", "telegram")
+
+
+def _channels() -> list[str]:
+    """DELIVERY_CHANNELS=email,telegram (default: email)."""
+    chosen = [c.lower() for c in _list("DELIVERY_CHANNELS")] or ["email"]
+    bad = [c for c in chosen if c not in CHANNELS]
+    if bad:
+        raise ValueError(f"DELIVERY_CHANNELS has unknown channel(s) {bad}; use email and/or telegram")
+    return list(dict.fromkeys(chosen))
 
 
 def _llm_provider() -> str | None:
@@ -111,6 +128,10 @@ def get_settings() -> Settings:
         gmail_refresh_token=os.environ.get("GMAIL_REFRESH_TOKEN") or None,
         gmail_service_account_json=os.environ.get("GMAIL_SERVICE_ACCOUNT_JSON") or None,
         gmail_delegated_user=os.environ.get("GMAIL_DELEGATED_USER") or None,
+        delivery_channels=_channels(),
+        telegram_bot_token=(os.environ.get("TELEGRAM_BOT_TOKEN") or "").strip() or None,
+        telegram_team_chat_ids=_list("TELEGRAM_TEAM_CHAT_IDS"),
+        telegram_reviewer_chat_ids=_list("TELEGRAM_REVIEWER_CHAT_IDS"),
         sources=load_yaml("sources.yaml").get("sources", []),
         topics=load_yaml("topics.yaml"),
         alert_rules=load_yaml("alert_rules.yaml"),

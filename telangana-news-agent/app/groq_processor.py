@@ -54,7 +54,6 @@ class GroqProcessor(LLMProcessor):
             raise LLMUnavailable("Groq call budget exhausted for this run/day")
         delay = 2.0
         for attempt in range(1, self.max_retries + 1):
-            self.on_call()
             try:
                 resp = self.http.post(f"{API_BASE}/chat/completions", json=self._body(system, prompt, schema))
             except httpx.HTTPError as exc:
@@ -64,6 +63,11 @@ class GroqProcessor(LLMProcessor):
                 delay *= 2
                 continue
 
+            if resp.status_code not in (429,):
+                self.on_call()  # budget counts requests Groq processed, not "slow down" replies
+            if resp.status_code == 400 and "json_validate_failed" in resp.text and attempt < self.max_retries:
+                log.info("Groq output failed its JSON check; retrying")
+                continue
             if resp.status_code == 400 and self._schema_mode and "response_format" in resp.text:
                 log.info("model %s does not support json_schema; switching to json_object mode", self.model)
                 self._schema_mode = False

@@ -51,6 +51,35 @@ scope:
          కార్పొరేట, పంచాయతీ, సర్పంచ్, మేయర్, ధర్నా, నిరసన, బంద్,
          రేవంత్, కేటీఆర్, కేసీఆర్, హరీశ్, భట్టి, కిషన్ రెడ్డి, బండి సంజయ్, ఒవైసీ, రాహుల్ గాంధీ, మోదీ]
 
+# Telugu -> English forms the AI must use when translating headlines. Only entries that appear in a
+# batch of headlines are sent. Add names the AI gets wrong (e.g. a name that is also an ordinary word).
+translation_glossary:
+  కవిత: Kavitha
+  సీతక్క: Seethakka
+  రేవంత్: Revanth Reddy
+  కేటీఆర్: KTR
+  కేసీఆర్: KCR
+  హరీశ్: Harish Rao
+  హరీష్: Harish Rao
+  భట్టి: Bhatti Vikramarka
+  ఉత్తమ్: Uttam Kumar Reddy
+  కోమటిరెడ్డి: Komatireddy
+  పొంగులేటి: Ponguleti
+  శ్రీధర్ బాబు: Sridhar Babu
+  కిషన్ రెడ్డి: Kishan Reddy
+  బండి సంజయ్: Bandi Sanjay
+  ఒవైసీ: Owaisi
+  బీఆర్ఎస్: BRS
+  కాంగ్రెస్: Congress
+  బీజేపీ: BJP
+  ఎంఐఎం: AIMIM
+  బంగాళాఖాతం: Bay of Bengal
+  ద్రోణి: trough
+  ఇందిరమ్మ: Indiramma
+  హైడ్రా: HYDRAA
+  మూసీ: Musi
+  కాళేశ్వరం: Kaleshwaram
+
 # Telangana's 33 districts. key = canonical English name used in emails.
 districts:
   Adilabad: [adilabad, ఆదిలాబాద్]

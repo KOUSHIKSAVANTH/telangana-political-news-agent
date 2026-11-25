@@ -25,6 +25,8 @@ astrology, celebrity and gadget news are out of scope: set political_relevant = 
 Hard rules:
 - Use ONLY facts stated in the evidence. Do not add background knowledge, numbers, dates, names, or quotes that are not in the evidence.
 - Write in English. Keep Telugu proper names, titles and places accurate (transliterate faithfully; do not anglicise or guess).
+- Never add or change titles, roles, offices or party status (e.g. "former" vs current Chief Minister, ruling vs
+  opposition party) beyond what the evidence states. If the evidence says "former", keep "former".
 - Preserve uncertainty: if the evidence says "alleged", "reportedly", "likely", keep that.
 - evidence_url_ids must contain only ids from the EVIDENCE list, and only those that support the summary. Never invent ids or URLs.
 - If the items are clearly about different events, summarise the dominant event and cite only its ids.
@@ -38,8 +40,9 @@ Hard rules:
 """
 
 SYSTEM_TRANSLATE = """Translate each Telugu news headline into concise, neutral English.
-Keep proper names (people, parties, places, schemes) accurate and transliterated faithfully. Do not add information.
-Return every id exactly once."""
+These are political and civic headlines: a word that can be a person's name usually IS a name here
+(e.g. కవిత = Kavitha, not "poem"). Transliterate names, parties, places and schemes faithfully; never translate
+a name into an ordinary word. Do not add information. Return every id exactly once."""
 
 
 class TitleTranslation(BaseModel):
@@ -62,6 +65,7 @@ class LLMProcessor:
     """Shared prompting + validation. Subclasses implement `_generate`."""
 
     name = "llm"
+    glossary: dict[str, str] = {}  # Telugu -> English terms/names (config/topics.yaml: translation_glossary)
 
     def _generate(self, *, system: str, prompt: str, schema: type[BaseModel]) -> BaseModel:
         raise NotImplementedError
@@ -70,6 +74,10 @@ class LLMProcessor:
         if not items:
             return {}
         prompt = json.dumps([{"id": i, "title": t} for i, t in items], ensure_ascii=False)
+        used = {te: en for te, en in self.glossary.items() if any(te in t for _, t in items)}
+        if used:
+            glossary = "\n".join(f"{te} = {en}" for te, en in used.items())
+            prompt = f"GLOSSARY (use these English forms):\n{glossary}\n\nHEADLINES:\n{prompt}"
         result = self._generate(system=SYSTEM_TRANSLATE, prompt=prompt, schema=TitleTranslations)
         wanted = {i for i, _ in items}
         return {t.id: t.title_en.strip() for t in result.items if t.id in wanted and t.title_en.strip()}
